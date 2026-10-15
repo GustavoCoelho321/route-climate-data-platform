@@ -1,0 +1,47 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow_password
+      POSTGRES_DB: portfolio_db
+    ports:
+      - "5432:5432"
+
+  marquez:
+    image: marquezproject/marquez:latest
+    ports:
+      - "5000:5000" # API
+      - "3000:3000" # UI Visual de Linhagem
+
+  airflow-webserver:
+    image: apache/airflow:2.7.1-python3.10
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - marquez
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_password@postgres/portfolio_db
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__OPENLINEAGE__TRANSPORT={"type":"http","url":"http://marquez:5000"}
+      - AIRFLOW__OPENLINEAGE__NAMESPACE=portfolio_logistica
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./dbt_weather:/opt/airflow/dbt_weather
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1-python3.10
+    command: scheduler
+    depends_on:
+      - airflow-webserver
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_password@postgres/portfolio_db
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__OPENLINEAGE__TRANSPORT={"type":"http","url":"http://marquez:5000"}
+      - AIRFLOW__OPENLINEAGE__NAMESPACE=portfolio_logistica
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./dbt_weather:/opt/airflow/dbt_weather
